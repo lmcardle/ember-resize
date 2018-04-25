@@ -3,7 +3,7 @@ import Service from '@ember/service';
 import Evented from '@ember/object/evented';
 import { classify } from '@ember/string';
 import { oneWay } from '@ember/object/computed';
-import { debounce } from '@ember/runloop';
+import { debounce, cancel } from '@ember/runloop';
 import EmberObject, { set, getWithDefault } from '@ember/object';
 
 // jscs:disable disallowDirectPropertyAccess
@@ -15,6 +15,7 @@ export default Base.extend(Evented, {
   _oldHeight: null,
   _oldWidthDebounced: null,
   _oldHeightDebounced: null,
+  _scheduledDebounce: null,
 
   debounceTimeout: oneWay('defaultDebounceTimeout'),
   widthSensitive: oneWay('defaultWidthSensitive'),
@@ -25,7 +26,8 @@ export default Base.extend(Evented, {
     this._setDefaults();
     this._onResizeHandler = (evt) => {
       this._fireResizeNotification(evt);
-      debounce(this, this._fireDebouncedResizeNotification, evt, this.get('debounceTimeout'));
+      let scheduledDebounce = debounce(this, this._fireDebouncedResizeNotification, evt, this.get('debounceTimeout'));
+      this._scheduledDebounce = scheduledDebounce;
     };
     this._installResizeListener();
   },
@@ -33,6 +35,7 @@ export default Base.extend(Evented, {
   destroy() {
     this._super(...arguments);
     this._uninstallResizeListener();
+    this._cancelScheduledDebounce();
   },
 
   _setDefaults() {
@@ -65,6 +68,10 @@ export default Base.extend(Evented, {
 
   _uninstallResizeListener() {
     window.removeEventListener('resize', this._onResizeHandler);
+  },
+  
+  _cancelScheduledDebounce() {
+    cancel(this._scheduledDebounce);
   },
 
   _fireResizeNotification(evt) {
